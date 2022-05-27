@@ -1,3 +1,4 @@
+use invaders::{frame, render};
 use rusty_audio::Audio;
 use std::{
     error::Error,
@@ -28,8 +29,28 @@ fn main() -> Result<(), Box<dyn Error>> {
     stdout.execute(EnterAlternateScreen)?;
     stdout.execute(Hide)?;
 
+    // Render loop in a separate thread
+    let (render_tx, render_rx) = mpsc::channel();
+    let render_handle = thread::spawn(move || {
+        let mut last_frame = frame::new_frame();
+        let mut stdout = io::stdout();
+        render::render(&mut stdout, &last_frame, &last_frame, true);
+
+        loop {
+            let curr_frame = match render_rx.recv() {
+                Ok(x) => x,
+                Err(_) => break,
+            };
+            render::render(&mut stdout, &last_frame, &curr_frame, false);
+            last_frame = curr_frame;
+        }
+    });
+
     // Game Loop
     'gameloop: loop {
+        // Per-frame init
+        let curr_frame = frame::new_frame();
+
         // Input
         while event::poll(Duration::default())? {
             if let Event::Key(key_event) = event::read()? {
@@ -42,9 +63,21 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
             }
         }
+
+        // Draw & render
+        // send current frame to render thread. This will fail first few times, b/c game loop
+        // will get going before render loop, so there won't be a receiving of the channel
+        // available for a while. Using let _ = ...
+        // ignores the error.
+        let _ = render_tx.send(curr_frame);
+
+        // wait a bit because game loop is much faster then render loop.
+        thread::sleep(Duration::from_millis(1));
     }
 
     //Cleanup
+    drop(render_tx);
+    render_handle.join().unwrap();
     audio.wait();
     stdout.execute(Show)?;
     stdout.execute(LeaveAlternateScreen)?;
