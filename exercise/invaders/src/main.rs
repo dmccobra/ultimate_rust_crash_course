@@ -2,8 +2,8 @@ use invaders::{frame, render};
 use rusty_audio::Audio;
 use std::{
     error::Error,
-    sync::mpsc::{self, Receiver},
-    time::{Duration, Instant},
+    sync::mpsc::{self},
+    time::{Duration},
     {io, thread},
 };
 use crossterm::{
