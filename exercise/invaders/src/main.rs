@@ -1,4 +1,4 @@
-use invaders::{frame, render};
+use invaders::{frame::{self, Drawable}, render, player::Player};
 use rusty_audio::Audio;
 use std::{
     error::Error,
@@ -47,14 +47,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     });
 
     // Game Loop
+    let mut player = Player::new();
     'gameloop: loop {
         // Per-frame init
-        let curr_frame = frame::new_frame();
+        let mut curr_frame = frame::new_frame();
 
         // Input
         while event::poll(Duration::default())? {
             if let Event::Key(key_event) = event::read()? {
                 match key_event.code {
+                    KeyCode::Left => player.move_left(),
+                    KeyCode::Right => player.move_right(),
                     KeyCode::Esc | KeyCode::Char('q') => {
                         audio.play("lose");
                         break 'gameloop;
@@ -69,6 +72,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         // will get going before render loop, so there won't be a receiving of the channel
         // available for a while. Using let _ = ...
         // ignores the error.
+        player.draw(&mut curr_frame);
         let _ = render_tx.send(curr_frame);
 
         // wait a bit because game loop is much faster then render loop.
